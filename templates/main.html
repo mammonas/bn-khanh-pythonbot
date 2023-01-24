@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PanicSell</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+    $(document).ready(function(){
+      $("#btn_approve").click(function(){
+        $('#approve_result').html('');
+        my_data = {"contract": $('#token_contract').val(), "gas": $('#approve_gas').val()};
+        $.ajax({
+            url: "/approve",
+            type: "POST",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(my_data),
+            success: function (data) {
+                handle_approve_data(data);
+                get_approve_status();
+            },
+        });
+      });
+    });
+    $(document).ready(function(){
+      $("#btn_sell").click(function(){
+        $('#sell_result').html('');
+        sell_data = {"contract": $('#token_contract').val(), "gas": $('#sell_gas').val(), "sell_currency": $('#sell_currency').val(), "sell_time": $('#sell_time').val()};
+        console.log(sell_data);
+        $.ajax({
+            url: "/sell",
+            type: "POST",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(sell_data),
+            success: function (data) {
+                handle_sell_data(data);
+                get_sell_status();
+            },
+        });
+      });
+    });
+    $(document).ready(function(){
+      $("#btn_transfer").click(function(){
+        $('#transfer_result').html('');
+        transfer_data = {"contract": $('#token_contract').val(), "to_address": $('#to_address').val(), "gas": $('#transfer_gas').val(), "transfer_time": $('#transfer_time').val()};
+        console.log(transfer_data);
+        $.ajax({
+            url: "/transfer",
+            type: "POST",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(transfer_data),
+            success: function (data) {
+                handle_transfer_data(data);
+                get_transfer_status();
+            },
+        });
+      });
+    });
+    function get_transfer_status() {
+        $.ajax({
+            url: "/transfer",
+            type: "GET",
+            dataType: 'json',
+            contentType: 'application/json',
+            success: function (data) {
+                const is_success_all = handle_transfer_data(data);
+                if (!is_success_all) {
+                    setTimeout(get_transfer_status, 100);
+                }
+            },
+        });
+    }
+    function handle_transfer_data(data) {
+        var is_success_all = true;
+        var html_rs = '';
+        data['result'].forEach(element => {
+            console.log(element['account_contract']);
+            console.log(element['state']);
+            const contract = element['account_contract'];
+            var state = element['state'];
+            if (state === 'Processing') {
+                is_success_all = false;
+                state = state + ' <button type="button" class="button button--loading"></button>'
+            }
+            else if (state === 'Success') {
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Success</a>'
+            }
+            else if (state === 'Failed') {
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Failed</a>'
+            }
+            html_rs += '<div>' + element['account_contract'] + ': ' + state + '</div>';
+        });
+        if ($("#transfer_result").html() != html_rs) {
+            $('#transfer_result').html(html_rs);
+        }
+        return is_success_all;
+    }
+
+    function retry(address_contract){
+        console.log('Comes retry');
+        retry_data = {"address_contract": address_contract, "contract": $('#token_contract').val(), "gas": $('#sell_gas').val(), "sell_currency": $('#sell_currency').val(), "sell_time": ""};
+        console.log(retry_data);
+        $.ajax({
+            url: "/retry",
+            type: "POST",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(retry_data),
+            success: function (data) {
+                handle_sell_data(data);
+                get_sell_status();
+            },
+        });
+    }
+
+    function get_sell_status() {
+        $.ajax({
+            url: "/sell",
+            type: "GET",
+            dataType: 'json',
+            contentType: 'application/json',
+            success: function (data) {
+                const is_success_all = handle_sell_data(data);
+                if (!is_success_all) {
+                    setTimeout(get_sell_status, 100);
+                }
+            },
+        });
+    }
+
+    function handle_sell_data(data) {
+        var count_finished = 0;
+        var html_rs = '';
+        data['result'].forEach(element => {
+            console.log(element);
+            console.log(element['account_contract']);
+            console.log(element['state']);
+            const contract = element['account_contract'];
+            var state = element['state'];
+            if (state === 'Processing') {
+                state = state + ' <button type="button" class="button button--loading"></button>'
+            }
+            else if (state === 'Success') {
+                count_finished += 1;
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Success</a>'
+            }
+            else if (state === 'Failed') {
+                count_finished += 1;
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Failed</a>'
+                state += '  <a href="#" onclick="retry(' + "'" +element['account_contract']+ "'" + ');return false;">Retry</a>'
+            }
+            html_rs += '<div>' + element['account_contract'] + ': ' + state + '</div>';
+        });
+        if ($("#sell_result").html() != html_rs) {
+            $('#sell_result').html(html_rs);
+        }
+        return count_finished == data['result'].length;
+    }
+
+    function get_approve_status() {
+        $.ajax({
+            url: "/approve",
+            type: "GET",
+            dataType: 'json',
+            contentType: 'application/json',
+            success: function (data) {
+                const is_success_all = handle_approve_data(data);
+                if (!is_success_all) {
+                    setTimeout(get_approve_status, 100);
+                }
+            },
+        });
+    }
+
+    function handle_approve_data(data) {
+        var is_success_all = true;
+        var html_rs = '';
+        data['result'].forEach(element => {
+            console.log(element['account_contract']);
+            console.log(element['state']);
+            const contract = element['account_contract'];
+            var state = element['state'];
+            if (state === 'Processing') {
+                is_success_all = false;
+                state = state + ' <button type="button" class="button button--loading"></button>'
+            }
+            else if (state === 'Success') {
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Success</a>'
+            }
+            else if (state === 'Already Approved') {
+                state = 'Already Approved'
+            }
+            else if (state === 'Failed') {
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Failed</a>'
+            }
+            html_rs += '<div>' + element['account_contract'] + ': ' + state + '</div>';
+        });
+        if ($("#approve_result").html() != html_rs) {
+            $('#approve_result').html(html_rs);
+        }
+        return is_success_all;
+    }
+    </script>
+</head>
+<body>
+<form action="/" method="post">
+<label for="network">Network:</label>
+<select name="network" id="network">
+{% for network in network_list %}
+    <option value={{network}} {%if network == selected_network %} selected {% endif %}>{{network}}</option>
+{% endfor %}
+</select>
+<br/><br/>
+<label for="network">Account JSON:</label>
+<select name="account" id="account">
+{% for account_json in json_account_list %}
+    <option value={{account_json}} {%if account_json == selected_json %} selected {% endif %}>{{account_json}}</option>
+{% endfor %}
+</select>
+<button type="submit" formmethod="post">LOAD ACCOUNTS</button>
+</form>
+
+Loaded:
+<br/>
+{% for account in accounts_list %}
+{{ account['address'] }}
+<br/>
+{% endfor %}
+==========================
+<br/>
+{% if accounts_list %}
+<label>Token Contract:</label>
+<input id="token_contract" name="token_contract" type="text" maxlength="500" size="64"/>
+<br/><br/>
+<button name="btn_approve" id="btn_approve" type="button">APPROVE SPEND</button>
+<label>Gas:</label>
+<input id="approve_gas" name="approve_gas" type="number" value={{prefill_approve_gas}} size="5" min="5"/>
+<br/>
+<div id="approve_result"></div>
+==========================
+<br/>
+<label>Time to sell:</label>
+<input id="sell_time" name="sell_time" type="time" maxlength="500" size="64"/>
+<label>Sell To:</label>
+<select name="sell_currency" id="sell_currency">
+{% for currency in currency_list %}
+    <option value={{currency['contract']}}>{{currency['name']}}</option>
+{% endfor %}
+</select>
+<br/><br/>
+<button name="btn_sell" id="btn_sell" type="button">PANIC SELL</button>
+<label>Gas:</label>
+<input id="sell_gas" name="sell_gas" type="number" value={{prefill_sell_gas}} size="1" min="5" />
+<br/>
+<div id="sell_result"></div>
+==========================
+<br/>
+<label>Time to transfer:</label>
+<input id="transfer_time" name="transfer_time" type="time" maxlength="500" size="64"/>
+<label>To Address:</label>
+<input id="to_address" name="to_address" type="text" maxlength="500" size="64"/>
+<br/><br/>
+<button name="btn_transfer" id="btn_transfer" type="button">TRANSFER</button>
+<label>Gas:</label>
+<input id="transfer_gas" name="transfer_gas" type="number" value={{prefill_transfer_gas}} size="1" min="5" />
+<br/>
+<div id="transfer_result"></div>
+{% endif %}
+</body>
+</html>

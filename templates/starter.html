@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Starter</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+    $(document).ready(function(){
+      $("#btn_release").click(function(){
+        $('#release_result').html('');
+        my_data = {"release_contract": $('#release_contract').val(), "gas": $('#release_gas').val(), "release_time": $('#release_time').val(), "retry_number": $('#release_retry_number').val(), "network": $('#network').val()};
+        $.ajax({
+            url: "/starter_release",
+            type: "POST",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(my_data),
+            success: function (data) {
+                handle_release_data(data);
+                get_release_status();
+            },
+        });
+      });
+    });
+
+    function get_release_status() {
+        $.ajax({
+            url: "/starter_release",
+            type: "GET",
+            dataType: 'json',
+            contentType: 'application/json',
+            success: function (data) {
+                const is_success_all = handle_release_data(data);
+                if (!is_success_all) {
+                    setTimeout(get_release_status, 100);
+                }
+            },
+        });
+    }
+
+    function handle_release_data(data) {
+        var count_finished = 0;
+        var html_rs = '';
+        data['result'].forEach(element => {
+            console.log(element);
+            console.log(element['account_contract']);
+            console.log(element['state']);
+            const contract = element['account_contract'];
+            var state = element['state'];
+            var release_count = element['number_of_release'];
+            if (state === 'Processing') {
+                state = 'Try: ' + release_count + ' - ' +  state + ' <button type="button" class="button button--loading"></button>'
+            }
+            else if (state === 'Success') {
+                count_finished += 1;
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Success</a>'
+            }
+            else if (state === 'Failed') {
+                count_finished += 1;
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Failed</a>'
+                state += '  <a href="#" onclick="retry_release(' + "'" +element['release_ct']+ "'" + ', ' + "'" +element['account_contract']+ "'" + ');return false;">Retry</a>'
+            }
+            html_rs += '<div>' + element['account_contract'] + ': ' + state + '</div>';
+        });
+        if ($("#release_result").html() != html_rs) {
+            $('#release_result').html(html_rs);
+        }
+        return count_finished == data['result'].length;
+    }
+
+    function retry_release(address_contract, release_ct){
+        console.log('Comes retry release');
+        retry_data = {"address_contract": address_contract, "release_ct": release_ct, "gas": $('#release_gas').val(), "release_time": "", "retry_number": 0, "network": $('#network').val()};
+        $.ajax({
+            url: "/starter_release_retry",
+            type: "POST",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(retry_data),
+            success: function (data) {
+                handle_release_data(data);
+                get_release_status();
+            },
+        });
+    }
+
+    </script>
+</head>
+<body>
+<form action="/starter" method="post">
+<br/>
+<label>Account JSON:</label>
+<select name="account" id="account">
+{% for account_json in json_account_list %}
+    <option value={{account_json}} {%if account_json == selected_json %} selected {% endif %}>{{account_json}}</option>
+{% endfor %}
+</select>
+<button type="submit" formmethod="post">LOAD ACCOUNTS</button>
+</form>
+
+Loaded:
+<br/>
+{% for account in accounts_list %}
+{{ account['address'] }}
+<br/>
+{% endfor %}
+==========================
+{% if accounts_list %}
+<br/><br/>
+<label>Release Contract:</label>
+<input id="release_contract" name="release_contract" type="text" maxlength="500" size="64"/>
+<br/><br/>
+<label for="network">Network:</label>
+<select name="network" id="network">
+{% for network in network_list %}
+    <option value={{network}} {%if network == selected_network %} selected {% endif %}>{{network}}</option>
+{% endfor %}
+</select>
+<label>Time to release:</label>
+<input id="release_time" name="release_time" type="time" maxlength="500" size="64"/>
+<br/><br/>
+<label>Gas:</label>
+<input id="release_gas" name="release_gas" type="number" maxlength="500" value={{starter_release_gas}} size="5"/>
+<label>Retry:</label>
+<input id="release_retry_number" name="release_retry_number" type="number" maxlength="500" value={{starter_release_retry_number}} size="5"/>
+<br/><br/>
+<button name="btn_release" id="btn_release" type="button">AUTO CLAIM TOKENS</button>
+<div id="release_result"></div>
+==========================
+{% endif %}
+
+</body>
+</html>

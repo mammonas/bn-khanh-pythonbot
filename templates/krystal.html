@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>krystal</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script>
+    $(document).ready(function(){
+      $("#btn_release").click(function(){
+        $('#release_result').html('');
+        my_data = {"pool_id": $('#pool_id').val(), "vest_amount": $('#vest_amount').val(), "token_decimal": $('#token_decimal').val(), "gas": $('#release_gas').val(), "release_time": $('#release_time').val(), "retry_number": $('#release_retry_number').val(), "network": $('#network').val()};
+        $.ajax({
+            url: "/krystal_release",
+            type: "POST",
+            dataType: 'json',
+            contentType: 'application/json',
+            data: JSON.stringify(my_data),
+            success: function (data) {
+                handle_release_data(data);
+                get_release_status();
+            },
+        });
+      });
+    });
+
+    function get_release_status() {
+        $.ajax({
+            url: "/krystal_release",
+            type: "GET",
+            dataType: 'json',
+            contentType: 'application/json',
+            success: function (data) {
+                const is_success_all = handle_release_data(data);
+                if (!is_success_all) {
+                    setTimeout(get_release_status, 100);
+                }
+            },
+        });
+    }
+
+    function handle_release_data(data) {
+        var count_finished = 0;
+        var html_rs = '';
+        data['result'].forEach(element => {
+            console.log(element);
+            console.log(element['account_contract']);
+            console.log(element['state']);
+            const contract = element['account_contract'];
+            var state = element['state'];
+            var release_count = element['number_of_release'];
+            if (state === 'Processing') {
+                state = 'Try: ' + release_count + ' - ' +  state + ' <button type="button" class="button button--loading"></button>'
+            }
+            else if (state === 'Success') {
+                count_finished += 1;
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Success</a>'
+            }
+            else if (state === 'Failed') {
+                count_finished += 1;
+                state = '<a href="' + element['tx_id'] + '" target="_blank">Failed</a>'
+            }
+            html_rs += '<div>' + element['account_contract'] + ': ' + state + '</div>';
+        });
+        if ($("#release_result").html() != html_rs) {
+            $('#release_result').html(html_rs);
+        }
+        return count_finished == data['result'].length;
+    }
+    </script>
+</head>
+<body>
+<form action="/krystal" method="post">
+<br/>
+<label>Account JSON:</label>
+<select name="account" id="account">
+{% for account_json in json_account_list %}
+    <option value={{account_json}} {%if account_json == selected_json %} selected {% endif %}>{{account_json}}</option>
+{% endfor %}
+</select>
+<button type="submit" formmethod="post">LOAD ACCOUNTS</button>
+</form>
+
+Loaded:
+<br/>
+{% for account in accounts_list %}
+{{ account['address'] }}
+<br/>
+{% endfor %}
+==========================
+{% if accounts_list %}
+<br/><br/>
+<label>Pool ID:</label>
+<input id="pool_id" name="pool_id" type="text" maxlength="200" size="10"/>
+<label>Vest Amount:</label>
+<input id="vest_amount" name="vest_amount" type="text" maxlength="200" size="10"/>
+<label>Token Decimal:</label>
+<input id="token_decimal" name="token_decimal" type="text" maxlength="200" value={{krystal_token_decimal}} size="10"/>
+<br/><br/>
+<label for="network">Network:</label>
+<select name="network" id="network">
+{% for network in network_list %}
+    <option value={{network}} {%if network == selected_network %} selected {% endif %}>{{network}}</option>
+{% endfor %}
+</select>
+<label>Time to release:</label>
+<input id="release_time" name="release_time" type="time" maxlength="500" size="64"/>
+<br/><br/>
+<label>Gas:</label>
+<input id="release_gas" name="release_gas" type="number" maxlength="500" value={{krystal_release_gas}} size="5"/>
+<label>Retry:</label>
+<input id="release_retry_number" name="release_retry_number" type="number" maxlength="500" value={{krystal_release_retry_number}} size="5"/>
+<br/><br/>
+<button name="btn_release" id="btn_release" type="button">AUTO CLAIM TOKENS</button>
+<div id="release_result"></div>
+==========================
+{% endif %}
+
+</body>
+</html>
