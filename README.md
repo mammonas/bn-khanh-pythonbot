@@ -1,6 +1,6 @@
 # Python Automation Bot
 
-Khanh - Automation Engineer.
+Khanh - Software Engineer.
 
 ```shell
 Python3 & Flask & web3py.
